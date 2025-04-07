@@ -46,25 +46,25 @@ To run the script, you must provide the executable file you want to strip. Optio
    If you have two files, `functions.txt` and `globals.txt`, listing the symbols you want to remove:
 
    ```bash
-   ./strip_partial.sh -e my_executable -f functions.txt -g globals.txt
+   ./strip-simplifier.sh -e my_executable -f functions.txt -g globals.txt
    ```
 
 2. **Strip Only Functions:**
 
    ```bash
-   ./strip_partial.sh -e my_executable -f functions.txt
+   ./strip-simplifier.sh -e my_executable -f functions.txt
    ```
 
 3. **Strip Only Globals:**
 
    ```bash
-   ./strip_partial.sh -e my_executable -g globals.txt
+   ./strip-simplifier.sh -e my_executable -g globals.txt
    ```
 
 4. **Full Strip (No Symbol Files Provided):**
 
    ```bash
-   ./strip_partial.sh -e my_executable
+   ./strip-simplifier.sh -e my_executable
    ```
 
 ## How to Test
@@ -76,9 +76,9 @@ To run the script, you must provide the executable file you want to strip. Optio
    ```
 
 2. **Run the Script:**  
-   Use the provided `strip_partial.sh` script along with `globals.txt` and `functions.txt` to remove the specified symbols:
+   Use the provided `strip-simplifier.sh` script along with `globals.txt` and `functions.txt` to remove the specified symbols:
    ```bash
-   ./strip_partial.sh -e example -g globals.txt -f functions.txt
+   ./strip-simplifier.sh -e example -g globals.txt -f functions.txt
    ```
 
 3. **Verify the Result:**  
