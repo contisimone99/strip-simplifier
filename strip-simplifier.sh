@@ -1,22 +1,22 @@
-# Funzione per eseguire un comando e controllarne l'esito
+# Function to execute a command and check its result
 run_command() {
     "$@"
     if [ $? -ne 0 ]; then
-        echo "Errore durante l'esecuzione del comando: $*"
+        echo "Error while executing the command: $*"
         exit 1
     fi
 }
 
 usage() {
-  echo "Utilizzo: $0 -e executable [-f functions_file] [-g globals_file]"
-  echo "   -e executable     : Nome dell'eseguibile da processare (obbligatorio)."
-  echo "   -f functions_file : File contenente i nomi delle funzioni da strippare (opzionale)."
-  echo "   -g globals_file   : File contenente i nomi delle variabili globali da strippare (opzionale)."
-  echo "   -h                : Mostra questo messaggio di aiuto."
+  echo "Usage: $0 -e executable [-f functions_file] [-g globals_file]"
+  echo "   -e executable     : Name of the executable to process (mandatory)."
+  echo "   -f functions_file : File containing the names of functions to strip (optional)."
+  echo "   -g globals_file   : File containing the names of global variables to strip (optional)."
+  echo "   -h                : Show this help message."
   exit 1
 }
 
-# Parsing degli argomenti
+# Parsing arguments
 while getopts ":e:f:g:h" opt; do
     case $opt in
         e)
@@ -32,56 +32,56 @@ while getopts ":e:f:g:h" opt; do
             usage
             ;;
         \?)
-            echo "Opzione non valida: -$OPTARG" >&2
+            echo "Invalid option: -$OPTARG" >&2
             usage
             ;;
         :)
-            echo "L'opzione -$OPTARG richiede un argomento." >&2
+            echo "Option -$OPTARG requires an argument." >&2
             usage
             ;;
     esac
 done
 
-# Verifica esistenza eseguibile
+# Check executable existence
 if [ -z "$EXECUTABLE" ]; then
-    echo "Errore: l'eseguibile è obbligatorio."
+    echo "Error: the executable is mandatory."
     usage
 fi
 
 if [ ! -f "$EXECUTABLE" ]; then
-    echo "Errore: l'eseguibile '$EXECUTABLE' non esiste."
+    echo "Error: the executable '$EXECUTABLE' does not exist."
     exit 1
 fi
 
-# Creazione backup dell'eseguibile
+# Create a backup of the executable
 run_command cp "$EXECUTABLE" "${EXECUTABLE}.backup"
 
-echo "=== Stato iniziale dei simboli ==="
+echo "=== Initial state of symbols ==="
 if [ -n "$GLOBALS_FILE" ]; then
-    echo "Variabili globali presenti:"
+    echo "Global variables present:"
     run_command nm "$EXECUTABLE" | grep -f "$GLOBALS_FILE"
 fi
 
 if [ -n "$FUNCTIONS_FILE" ]; then
-    echo -e "\nFunzioni presenti:"
+    echo -e "\nFunctions present:"
     run_command nm "$EXECUTABLE" | grep -f "$FUNCTIONS_FILE"
 fi
 
-# Se non sono stati passati file per funzioni e globali, esegue uno strip completo
+# If no files for functions and globals are provided, perform a full strip
 if [ -z "$GLOBALS_FILE" ] && [ -z "$FUNCTIONS_FILE" ]; then
-    echo -e "\nNessun file di funzioni o variabili globali fornito, eseguo uno strip completo."
+    echo -e "\nNo function or global variable file provided, performing a full strip."
     run_command strip "$EXECUTABLE"
-    echo "Strip completo effettuato. Backup salvato come ${EXECUTABLE}.backup"
+    echo "Full strip completed. Backup saved as ${EXECUTABLE}.backup"
     exit 0
 fi
 
-# Esecuzione dello strip per le variabili globali se il file è stato fornito
+# Perform strip for global variables if the file is provided
 if [ -n "$GLOBALS_FILE" ]; then
-    echo -e "\n=== Rimozione delle variabili globali ==="
+    echo -e "\n=== Removing global variables ==="
     while read -r symbol; do
-        # Salta eventuali righe vuote
+        # Skip empty lines
         if [ -n "$symbol" ]; then
-            echo "Rimozione del simbolo globale: $symbol"
+            echo "Removing global symbol: $symbol"
             run_command strip --strip-symbol="$symbol" "$EXECUTABLE"
             run_command objcopy --strip-symbol="$symbol" "$EXECUTABLE" "$EXECUTABLE.tmp"
             run_command mv "$EXECUTABLE.tmp" "$EXECUTABLE"
@@ -89,12 +89,12 @@ if [ -n "$GLOBALS_FILE" ]; then
     done < "$GLOBALS_FILE"
 fi
 
-# Esecuzione dello strip per le funzioni se il file è stato fornito
+# Perform strip for functions if the file is provided
 if [ -n "$FUNCTIONS_FILE" ]; then
-    echo -e "\n=== Rimozione delle funzioni ==="
+    echo -e "\n=== Removing functions ==="
     while read -r symbol; do
         if [ -n "$symbol" ]; then
-            echo "Rimozione della funzione: $symbol"
+            echo "Removing function: $symbol"
             run_command strip --strip-symbol="$symbol" "$EXECUTABLE"
             run_command objcopy --strip-symbol="$symbol" "$EXECUTABLE" "$EXECUTABLE.tmp"
             run_command mv "$EXECUTABLE.tmp" "$EXECUTABLE"
@@ -102,15 +102,15 @@ if [ -n "$FUNCTIONS_FILE" ]; then
     done < "$FUNCTIONS_FILE"
 fi
 
-echo -e "\n=== Verifica finale ==="
+echo -e "\n=== Final verification ==="
 if [ -n "$GLOBALS_FILE" ]; then
-    echo "Verifica delle variabili globali rimanenti:"
+    echo "Verifying remaining global variables:"
     nm "$EXECUTABLE" | grep -f "$GLOBALS_FILE"
 fi
 
 if [ -n "$FUNCTIONS_FILE" ]; then
-    echo -e "\nVerifica delle funzioni rimanenti:"
+    echo -e "\nVerifying remaining functions:"
     nm "$EXECUTABLE" | grep -f "$FUNCTIONS_FILE"
 fi
 
-echo -e "\nProcesso completato. Backup salvato come ${EXECUTABLE}.backup"
+echo -e "\nProcess completed. Backup saved as ${EXECUTABLE}.backup"
