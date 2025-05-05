@@ -6,8 +6,11 @@ This script is designed to simplify the process of partially stripping an execut
 - **Selective Symbol Stripping:**
   Remove only the specified symbols (functions and/or global variables) from your executable using `strip` and `objcopy`.
 
+- **Interactive Mode:**
+  If no symbol files are provided, the script can prompt you to input specific symbols to strip interactively.
+
 - **Complete Strip Fallback:**
-  If no symbol lists are provided, the script will automatically perform a full strip of the executable.
+  If no symbol lists are provided and interactive mode isn't enabled, the script will automatically perform a full strip of the executable.
 
 - **Error Handling:**
   The script checks the outcome of every command (such as `cp`, `strip`, `objcopy`, and `mv`) and exits with a clear error message if something goes wrong.
@@ -20,9 +23,6 @@ This script is designed to simplify the process of partially stripping an execut
   
 - **Command-Line Help:**
   Detailed help is available via the `-h` option, which explains how to use the script and its various options.
-
-- **Future Enhancements:**
-  The README also discusses potential improvements like interactive mode, automatic symbol detection and detailed logging.
 
 ## Usage
 
@@ -41,6 +41,9 @@ To run the script, you must provide the executable file you want to strip. Optio
 
 - `-r`
   **(Optional)** Restore the previously made backup executable in order to revert the strip operation. If it does not find a *.backup file in the current folder it throws an error message.
+
+- `-y`
+  **(Optional)** Enable interactive mode. If no symbol files are provided, the script will prompt you to input specific symbols to strip. If not used and no symbol files are provided, a full strip will be performed.
 
 - `-h`
   Displays a help message detailing the usage of the script.
@@ -67,15 +70,23 @@ To run the script, you must provide the executable file you want to strip. Optio
    ./strip-simplifier.sh -e my_executable -g globals.txt
    ```
 
-4. **Full Strip (No Symbol Files Provided):**
+4. **Interactive Mode (No Symbol Files):**
+
+   ```bash
+   ./strip-simplifier.sh -e my_executable -y
+   ```
+
+5. **Full Strip (No Symbol Files Provided):**
 
    ```bash
    ./strip-simplifier.sh -e my_executable
    ```
-5. **Restore the executable**
+
+6. **Restore the executable**
    ```bash
     ./strip-simplifier.sh -e my_executable -r
    ```
+
 ## How to Test
 
 1. **Compile the Example:**  
@@ -116,6 +127,7 @@ To run the script, you must provide the executable file you want to strip. Optio
     0000000000004014 D global_var2
    ```
    Which means that we correctly restored the backup from the stripped file.
+
 ## Technical Details
 
 The script utilizes both `strip` and `objcopy` to remove symbols. This dual approach ensures a higher level of confidence that the specified symbols are removed from the executable. It uses `nm` to display the symbols before and after the stripping process, which helps in verifying the changes.
@@ -130,11 +142,13 @@ Before any modifications are made, the script creates a backup of the original e
 
 ### Future Considerations
 
-While the script currently relies on user-provided files for symbol names, there are ideas for further improvements:
-- [ ] **Interactive Mode:** Prompt the user to decide on stripping symbols if no files are provided.
+While the script has been significantly improved with interactive mode and backup restoration, there are still ideas for further enhancements:
+- [x] **Interactive Mode:** Prompt the user to decide on stripping symbols if no files are provided.
 - [ ] **Automatic Symbol Detection:** Analyze the output of tools like `nm` or `readelf` to attempt an automatic distinction between library symbols and user-defined symbols. Note that this is challenging—especially for static executables—and might lead to false positives or negatives.
 - [ ] **Logging:** Create a detailed log file that tracks every step and command output for troubleshooting purposes.
 - [x] **Backup Restoration:** An option to automatically restore the backup if the stripping process fails or if the user wishes to revert the changes.
+- [ ] **Symbol Pattern Matching:** Add support for stripping symbols using pattern matching or regular expressions.
+- [ ] **Symbol Type Filtering:** Add options to strip specific types of symbols (e.g., only strip data symbols or only strip function symbols).
 
 ## Contributing
 
