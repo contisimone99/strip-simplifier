@@ -1,14 +1,15 @@
 #!/bin/bash
 # Usage:
-#   To strip: ./strip-simplifier.sh -e executable [-f functions_file] [-g globals_file]
-#   To restore: ./strip-simplifier.sh -e executable -r
+#   To strip: ./strip-simplifier.sh -e executable [-f functions_file] [-g globals_file] [-y]
+#   To restore: ./strip-simplifier.sh -e executable -r [-y]
 #
 # Options:
-#   -e executable     : Name of the executable to process (mandatory).
-#   -f functions_file : File containing the names of functions to strip (optional).
-#   -g globals_file   : File containing the names of global variables to strip (optional).
-#   -r                : Restore the backup (.backup) to the executable.
-#   -h                : Show this help message.
+#   -e executable         : Name of the executable to process (mandatory).
+#   -f functions_file     : File containing the names of functions to strip (optional).
+#   -g globals_file       : File containing the names of global variables to strip (optional).
+#   -r                    : Restore the backup (.backup) to the executable.
+#   -y                    : If no symbol files are provided, ask interactively for symbols to strip. Otherwise, do full strip.
+#   -h                    : Show this help message.
 
 # Function to execute a command and check its result
 run_command() {
@@ -20,42 +21,31 @@ run_command() {
 }
 
 usage() {
-  echo "Usage: $0 -e executable [-f functions_file] [-g globals_file] [-r]"
-  echo "   -e executable     : Name of the executable to process (mandatory)."
-  echo "   -f functions_file : File containing the names of functions to strip (optional)."
-  echo "   -g globals_file   : File containing the names of global variables to strip (optional)."
-  echo "   -r                : Restore the backup (.backup) to the executable."
-  echo "   -h                : Show this help message."
+  echo "Usage: $0 -e executable [-f functions_file] [-g globals_file] [-r] [-y]"
+  echo "   -e executable         : Name of the executable to process (mandatory)."
+  echo "   -f functions_file     : File containing the names of functions to strip (optional)."
+  echo "   -g globals_file       : File containing the names of global variables to strip (optional)."
+  echo "   -r                    : Restore the backup (.backup) to the executable."
+  echo "   -y                    : If no symbol files are provided, ask interactively for symbols to strip. Otherwise, do full strip."
+  echo "   -h                    : Show this help message."
   exit 1
 }
 
-# Parsing arguments
+# Default values
 RESTORE=0
-while getopts ":e:f:g:rh" opt; do
+INTERACTIVE_STRIP=0  # If set to 1, enter prompt mode to ask for symbols if no files are provided
+
+# Parsing arguments
+while getopts ":e:f:g:ryh" opt; do
     case $opt in
-        e)
-            EXECUTABLE="$OPTARG"
-            ;;
-        f)
-            FUNCTIONS_FILE="$OPTARG"
-            ;;
-        g)
-            GLOBALS_FILE="$OPTARG"
-            ;;
-        r)
-            RESTORE=1
-            ;;
-        h)
-            usage
-            ;;
-        \?)
-            echo "Invalid option: -$OPTARG" >&2
-            usage
-            ;;
-        :)
-            echo "Option -$OPTARG requires an argument." >&2
-            usage
-            ;;
+        e) EXECUTABLE="$OPTARG" ;;
+        f) FUNCTIONS_FILE="$OPTARG" ;;
+        g) GLOBALS_FILE="$OPTARG" ;;
+        r) RESTORE=1 ;;
+        y) INTERACTIVE_STRIP=1 ;;
+        h) usage ;;
+        \?) echo "Invalid option: -$OPTARG" >&2; usage ;;
+        :) echo "Option -$OPTARG requires an argument." >&2; usage ;;
     esac
 done
 
@@ -86,6 +76,32 @@ fi
 # Create a backup of the executable
 run_command cp "$EXECUTABLE" "${EXECUTABLE}.backup"
 
+# If no symbol files are provided
+if [ -z "$GLOBALS_FILE" ] && [ -z "$FUNCTIONS_FILE" ]; then
+    if [ $INTERACTIVE_STRIP -eq 1 ]; then
+        echo "No symbol files provided. Enter interactive mode to specify symbols."
+
+        echo "Enter function names to strip (one per line). Press Enter on an empty line to finish:"
+        FUNCTIONS_FILE=$(mktemp)
+        while IFS= read -r line; do
+            [ -z "$line" ] && break
+            echo "$line" >> "$FUNCTIONS_FILE"
+        done
+
+        echo "Enter global variable names to strip (one per line). Press Enter on an empty line to finish:"
+        GLOBALS_FILE=$(mktemp)
+        while IFS= read -r line; do
+            [ -z "$line" ] && break
+            echo "$line" >> "$GLOBALS_FILE"
+        done
+    else
+        echo "No symbol files provided. Performing full strip."
+        run_command strip "$EXECUTABLE"
+        echo "Full strip completed. Backup saved as ${EXECUTABLE}.backup"
+        exit 0
+    fi
+fi
+
 echo "=== Initial state of symbols ==="
 if [ -n "$GLOBALS_FILE" ]; then
     echo "Global variables present:"
@@ -97,14 +113,6 @@ if [ -n "$FUNCTIONS_FILE" ]; then
     run_command nm "$EXECUTABLE" | grep -f "$FUNCTIONS_FILE"
 fi
 
-# If no files for functions and globals are provided, perform a full strip
-if [ -z "$GLOBALS_FILE" ] && [ -z "$FUNCTIONS_FILE" ]; then
-    echo -e "\nNo function or global variable file provided, performing a full strip."
-    run_command strip "$EXECUTABLE"
-    echo "Full strip completed. Backup saved as ${EXECUTABLE}.backup"
-    exit 0
-fi
-
 # Perform strip for global variables if the file is provided
 if [ -n "$GLOBALS_FILE" ]; then
     echo -e "\n=== Removing global variables ==="
@@ -113,8 +121,8 @@ if [ -n "$GLOBALS_FILE" ]; then
         if [ -n "$symbol" ]; then
             echo "Removing global symbol: $symbol"
             run_command strip --strip-symbol="$symbol" "$EXECUTABLE"
-            run_command objcopy --strip-symbol="$symbol" "$EXECUTABLE" "$EXECUTABLE.tmp"
-            run_command mv "$EXECUTABLE.tmp" "$EXECUTABLE"
+            run_command objcopy --strip-symbol="$symbol" "$EXECUTABLE" "${EXECUTABLE}.tmp"
+            run_command mv "${EXECUTABLE}.tmp" "$EXECUTABLE"
         fi
     done < "$GLOBALS_FILE"
 fi
@@ -126,20 +134,20 @@ if [ -n "$FUNCTIONS_FILE" ]; then
         if [ -n "$symbol" ]; then
             echo "Removing function: $symbol"
             run_command strip --strip-symbol="$symbol" "$EXECUTABLE"
-            run_command objcopy --strip-symbol="$symbol" "$EXECUTABLE" "$EXECUTABLE.tmp"
-            run_command mv "$EXECUTABLE.tmp" "$EXECUTABLE"
+            run_command objcopy --strip-symbol="$symbol" "$EXECUTABLE" "${EXECUTABLE}.tmp"
+            run_command mv "${EXECUTABLE}.tmp" "$EXECUTABLE"
         fi
     done < "$FUNCTIONS_FILE"
 fi
 
 echo -e "\n=== Final verification ==="
 if [ -n "$GLOBALS_FILE" ]; then
-    echo "Verifying remaining global variables:"
+    echo "Verifying if there are any remaining global variables from the one to be removed:"
     nm "$EXECUTABLE" | grep -f "$GLOBALS_FILE"
 fi
 
 if [ -n "$FUNCTIONS_FILE" ]; then
-    echo -e "\nVerifying remaining functions:"
+    echo -e "\nVerifying if there are any remaining functions from the one to be removed:"
     nm "$EXECUTABLE" | grep -f "$FUNCTIONS_FILE"
 fi
 
