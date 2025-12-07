@@ -1,7 +1,7 @@
 #!/bin/bash
 # Usage:
-#   To strip: ./strip-simplifier.sh -e executable [-f functions_file] [-g globals_file] [-y]
-#   To restore: ./strip-simplifier.sh -e executable -r [-y]
+#   To strip: ./strip-simplifier.sh -e executable [-f functions_file] [-g globals_file] [-y] [-l log_file]
+#   To restore: ./strip-simplifier.sh -e executable -r [-l log_file]
 #
 # Options:
 #   -e executable         : Name of the executable to process (mandatory).
@@ -9,7 +9,38 @@
 #   -g globals_file       : File containing the names of global variables to strip (optional).
 #   -r                    : Restore the backup (.backup) to the executable.
 #   -y                    : If no symbol files are provided, ask interactively for symbols to strip. Otherwise, do full strip.
+#   -l log_file           : Path for the log file (optional). If omitted, a default log name is generated.
 #   -h                    : Show this help message.
+
+# Optional user-provided log files
+LOG_FILE=""
+
+init_log() {
+    local ts base
+    ts=$(date '+%Y%m%d_%H%M%S')
+    base=$(basename "$EXECUTABLE")
+
+    if [ -z "$LOG_FILE" ]; then
+        LOG_FILE="${base}.strip-simplifier.${ts}.log"
+    fi
+
+    touch "$LOG_FILE" 2>/dev/null
+    if [ $? -ne 0 ]; then
+        echo "Error: cannot write log file '$LOG_FILE'"
+        exit 1
+    fi
+
+    {
+        echo "=== strip-simplifier log ==="
+        echo "Timestamp: $(date -Is)"
+        echo "Command: $0 $*"
+        echo "Executable: $EXECUTABLE"
+        echo "----------------------------------------"
+    } >> "$LOG_FILE"
+
+    # Redirect all stdout/stderr to both terminal and log
+    exec > >(tee -a "$LOG_FILE") 2>&1
+}
 
 # Function to execute a command and check its result
 run_command() {
@@ -21,12 +52,13 @@ run_command() {
 }
 
 usage() {
-  echo "Usage: $0 -e executable [-f functions_file] [-g globals_file] [-r] [-y]"
+  echo "Usage: $0 -e executable [-f functions_file] [-g globals_file] [-r] [-y] [-l log_file]"
   echo "   -e executable         : Name of the executable to process (mandatory)."
   echo "   -f functions_file     : File containing the names of functions to strip (optional)."
   echo "   -g globals_file       : File containing the names of global variables to strip (optional)."
   echo "   -r                    : Restore the backup (.backup) to the executable."
   echo "   -y                    : If no symbol files are provided, ask interactively for symbols to strip. Otherwise, do full strip."
+  echo "   -l log_file           : Path for the log file (optional). If omitted, a default log name is generated."
   echo "   -h                    : Show this help message."
   exit 1
 }
@@ -36,11 +68,12 @@ RESTORE=0
 INTERACTIVE_STRIP=0  # If set to 1, enter prompt mode to ask for symbols if no files are provided
 
 # Parsing arguments
-while getopts ":e:f:g:ryh" opt; do
+while getopts ":e:f:g:l:ryh" opt; do
     case $opt in
         e) EXECUTABLE="$OPTARG" ;;
         f) FUNCTIONS_FILE="$OPTARG" ;;
         g) GLOBALS_FILE="$OPTARG" ;;
+        l) LOG_FILE="$OPTARG" ;;
         r) RESTORE=1 ;;
         y) INTERACTIVE_STRIP=1 ;;
         h) usage ;;
@@ -60,6 +93,9 @@ if [ ! -f "$EXECUTABLE" ]; then
     exit 1
 fi
 
+# Initialize logging (captures subsequent output and errors)
+init_log "$@"
+
 # If restore flag is set, perform restoration and exit
 if [ $RESTORE -eq 1 ]; then
     BACKUP_FILE="${EXECUTABLE}.backup"
@@ -70,6 +106,7 @@ if [ $RESTORE -eq 1 ]; then
     echo "Restoring backup from '$BACKUP_FILE' to '$EXECUTABLE'..."
     run_command cp "$BACKUP_FILE" "$EXECUTABLE"
     echo "Restoration completed successfully."
+    echo "Log saved to: $LOG_FILE"
     exit 0
 fi
 
@@ -98,11 +135,13 @@ if [ -z "$GLOBALS_FILE" ] && [ -z "$FUNCTIONS_FILE" ]; then
         echo "No symbol files provided. Performing full strip."
         run_command strip "$EXECUTABLE"
         echo "Full strip completed. Backup saved as ${EXECUTABLE}.backup"
+        echo "Log saved to: $LOG_FILE"
         exit 0
     fi
 fi
 
 echo "=== Initial state of symbols ==="
+
 if [ -n "$GLOBALS_FILE" ]; then
     echo "Global variables present:"
     run_command nm "$EXECUTABLE" | grep -f "$GLOBALS_FILE"
@@ -119,7 +158,7 @@ if [ -n "$GLOBALS_FILE" ]; then
     while read -r symbol; do
         # Skip empty lines
         if [ -n "$symbol" ]; then
-            echo "Removing global symbol: $symbol"
+            echo "Removing global variable: $symbol"
             run_command strip --strip-symbol="$symbol" "$EXECUTABLE"
             run_command objcopy --strip-symbol="$symbol" "$EXECUTABLE" "${EXECUTABLE}.tmp"
             run_command mv "${EXECUTABLE}.tmp" "$EXECUTABLE"
@@ -152,3 +191,4 @@ if [ -n "$FUNCTIONS_FILE" ]; then
 fi
 
 echo -e "\nProcess completed. Backup saved as ${EXECUTABLE}.backup"
+echo "Log saved to: $LOG_FILE"
