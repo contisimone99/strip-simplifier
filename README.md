@@ -15,6 +15,9 @@ This script is designed to simplify the process of partially stripping an execut
 - **Error Handling:**
   The script checks the outcome of every command (such as `cp`, `strip`, `objcopy`, and `mv`) and exits with a clear error message if something goes wrong.
 
+- **Logging:**
+  The script can create a detailed log file capturing each step and command output for troubleshooting purposes. You can specify a custom log path with `-l`. If omitted, a default timestamped log file will be generated in the current directory.
+
 - **Backup Creation:**
   A backup of the original executable is created before any modifications, ensuring you can always revert if needed.
 
@@ -45,6 +48,9 @@ To run the script, you must provide the executable file you want to strip. Optio
 - `-y`
   **(Optional)** Enable interactive mode. If no symbol files are provided, the script will prompt you to input specific symbols to strip. If not used and no symbol files are provided, a full strip will be performed.
 
+- `-l log_file`
+  **(Optional)** Write a detailed log of the run to the specified file. If omitted, a default timestamped log file will be created in the current directory.
+
 - `-h`
   Displays a help message detailing the usage of the script.
 
@@ -56,7 +62,7 @@ To run the script, you must provide the executable file you want to strip. Optio
 
    ```bash
    ./strip-simplifier.sh -e my_executable -f functions.txt -g globals.txt
-   ```
+    ```
 
 2. **Strip Only Functions:**
 
@@ -83,49 +89,65 @@ To run the script, you must provide the executable file you want to strip. Optio
    ```
 
 6. **Restore the executable**
+
    ```bash
     ./strip-simplifier.sh -e my_executable -r
    ```
 
+7. **Custom Log File:**
+
+   ```bash
+   ./strip-simplifier.sh -e my_executable -f functions.txt -g globals.txt -l strip.log
+   ```
+
 ## How to Test
 
-1. **Compile the Example:**  
+1. **Compile the Example:**
    Compile the provided `example.c` with debugging symbols:
+
    ```bash
    gcc -g -o example example.c
    ```
 
-2. **Run the Script:**  
+2. **Run the Script:**
    Use the provided `strip-simplifier.sh` script along with `globals.txt` and `functions.txt` to remove the specified symbols:
+
    ```bash
    ./strip-simplifier.sh -e example -g globals.txt -f functions.txt
    ```
 
-3. **Verify the Result:**  
+3. **Verify the Result:**
    Check the remaining symbols using `nm`:
+
    ```bash
    nm example | grep -E "global_var1|global_var2|function_to_strip|another_function_to_strip"
    ```
-    You should see that the functions defined in the regex are not present, while if you use `nm example | grep function_to_keep` you will see that `function_to_keep` is still present, while the symbols listed in the globals and functions files have been removed.
+
+   You should see that the functions defined in the regex are not present, while if you use `nm example | grep function_to_keep` you will see that `function_to_keep` is still present, while the symbols listed in the globals and functions files have been removed.
 
 4. **Restore the backup**:
    You can restore the backup by doing:
+
    ```sh
     ./strip-simplifier.sh -e example -r
    ```
-  
+
 5. **Verify the backup**:
    If you now check the example executable:
+
    ```
     nm example | grep -E "global_var1|global_var2|function_to_strip|another_function_to_strip"
    ```
+
    You should have an output like the following:
+
    ```
     000000000000119d T another_function_to_strip
     0000000000001169 T function_to_strip
     0000000000004010 D global_var1
     0000000000004014 D global_var2
    ```
+
    Which means that we correctly restored the backup from the stripped file.
 
 ## Technical Details
@@ -143,12 +165,13 @@ Before any modifications are made, the script creates a backup of the original e
 ### Future Considerations
 
 While the script has been significantly improved with interactive mode and backup restoration, there are still ideas for further enhancements:
-- [x] **Interactive Mode:** Prompt the user to decide on stripping symbols if no files are provided.
-- [ ] **Automatic Symbol Detection:** Analyze the output of tools like `nm` or `readelf` to attempt an automatic distinction between library symbols and user-defined symbols. Note that this is challenging—especially for static executables—and might lead to false positives or negatives.
-- [ ] **Logging:** Create a detailed log file that tracks every step and command output for troubleshooting purposes.
-- [x] **Backup Restoration:** An option to automatically restore the backup if the stripping process fails or if the user wishes to revert the changes.
-- [ ] **Symbol Pattern Matching:** Add support for stripping symbols using pattern matching or regular expressions.
-- [ ] **Symbol Type Filtering:** Add options to strip specific types of symbols (e.g., only strip data symbols or only strip function symbols).
+
+* [x] **Interactive Mode:** Prompt the user to decide on stripping symbols if no files are provided.
+* [ ] **Automatic Symbol Detection:** Analyze the output of tools like `nm` or `readelf` to attempt an automatic distinction between library symbols and user-defined symbols. Note that this is challenging—especially for static executables—and might lead to false positives or negatives.
+* [x] **Logging:** Create a detailed log file that tracks every step and command output for troubleshooting purposes.
+* [x] **Backup Restoration:** An option to automatically restore the backup if the stripping process fails or if the user wishes to revert the changes.
+* [ ] **Symbol Pattern Matching:** Add support for stripping symbols using pattern matching or regular expressions.
+* [ ] **Symbol Type Filtering:** Add options to strip specific types of symbols (e.g., only strip data symbols or only strip function symbols).
 
 ## Contributing
 
@@ -157,3 +180,5 @@ Contributions are welcome! If you have ideas for new features, improvements, or 
 ## License
 
 Distributed under the MIT License. See the [LICENSE](LICENSE) file for more details.
+
+```
