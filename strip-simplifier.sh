@@ -21,7 +21,7 @@ init_log() {
     base=$(basename "$EXECUTABLE")
 
     if [ -z "$LOG_FILE" ]; then
-        LOG_FILE="${base}.strip-simplifier.${ts}.log"
+        LOG_FILE="${base}.${ts}.log"
     fi
 
     touch "$LOG_FILE" 2>/dev/null
